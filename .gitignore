@@ -1,0 +1,15 @@
+/.env
+/.env.*
+!/.env.example
+/node_modules/
+/artifacts/
+/build/
+/dist/
+/output/
+/SEO/articles/
+/SEO/publication/plan.json
+/SEO/*.zip
+__pycache__/
+*.pyc
+*.log
+.DS_Store
