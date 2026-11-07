@@ -7,11 +7,13 @@ import fcntl
 import http.client
 import io
 import json
+import os
 from pathlib import Path, PurePosixPath
 import shutil
 import sqlite3
 import tempfile
 import time
+from urllib.parse import urlsplit
 
 import publisher
 
@@ -32,13 +34,32 @@ def verify_http(published, future, bundle, inventory):
         checks.append(('jaxgo.ru', True, future[0]['url'], 404, None))
     for host, tls, path, code, location in checks:
         connection = http.client.HTTPSConnection if tls else http.client.HTTPConnection
-        with closing(connection(host, timeout=12)) as client:
-            client.request('GET', path + query, headers={'Cache-Control': 'no-cache'})
+        gateway = os.environ.get('JAXGO_VERIFICATION_PROXY')
+        endpoint = path + query
+        if gateway:
+            parsed = urlsplit(gateway)
+            if parsed.scheme != 'http' or parsed.hostname != '127.0.0.1' or not parsed.port:
+                raise ValueError('Verification proxy must use a local SSH tunnel')
+            client = http.client.HTTPConnection(parsed.hostname, parsed.port, timeout=20)
+            endpoint = ('https' if tls else 'http')+'://'+host+endpoint
+        else:
+            client = connection(host, timeout=12)
+        with closing(client):
+            client.request('GET', endpoint, headers={'Cache-Control': 'no-cache'})
             response = client.getresponse()
             if (response.status, response.getheader('Location')) != (code, location):
                 raise ValueError(f'Unexpected HTTP result for {host}{path}: {response.status}')
     for name, checksum in inventory.items():
-        if publisher.digest(publisher.fetch(name)) != checksum:
+        if gateway:
+            with closing(http.client.HTTPConnection(parsed.hostname, parsed.port, timeout=20)) as client:
+                client.request('GET', 'https://jaxgo.ru/'+name+query)
+                response = client.getresponse()
+                if response.status != 200:
+                    raise ValueError('Inventory check failed: '+name)
+                data = response.read()
+        else:
+            data = publisher.fetch(name)
+        if publisher.digest(data) != checksum:
             raise ValueError(f'Published bytes differ from {bundle.name}: {name}')
 
 
