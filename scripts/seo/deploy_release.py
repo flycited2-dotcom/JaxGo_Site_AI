@@ -142,7 +142,14 @@ def migrate(root, state, stage):
                             archived = str(PurePosixPath(name).with_name('.jaxgo-retired-'+tag+'-'+PurePosixPath(name).name))
                             retired[name] = archived
                             ftp.rename('/public_html/'+name, '/public_html/'+archived)
-                        verify_http(published, future, bundle, inventory)
+                        for attempt in range(3):
+                            try:
+                                verify_http(published, future, bundle, inventory)
+                                break
+                            except OSError:
+                                if attempt == 2:
+                                    raise
+                                time.sleep(2)
                         for name in ('releases', 'plan.json', 'publisher.py'):
                             (root/name).rename(backup/name)
                             swapped.append(name)
