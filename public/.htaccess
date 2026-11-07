@@ -10,7 +10,8 @@ Options -Indexes
   RewriteCond %{THE_REQUEST} \s/+articles/index\.html[?\s] [NC]
   RewriteRule ^articles/index\.html$ https://jaxgo.ru/articles/ [R=301,L,NE]
   RewriteCond %{THE_REQUEST} \s/+articles/[a-z0-9-]+\.html[?\s] [NC]
-  RewriteCond %{DOCUMENT_ROOT}/articles/$1/index.html -f
+  RewriteCond %{REQUEST_FILENAME} ^(.+)\.html$
+  RewriteCond %1/index.html -f
   RewriteRule ^articles/([a-z0-9-]+)\.html$ https://jaxgo.ru/articles/$1/ [R=301,L,NE]
   RewriteCond %{THE_REQUEST} \s/+articles/(?:[a-z0-9-]+/|page/[0-9]+/)index\.html[?\s] [NC]
   RewriteCond %{REQUEST_FILENAME} -f
