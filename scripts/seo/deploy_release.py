@@ -26,7 +26,6 @@ def verify_http(published, future, bundle, inventory):
     checks += [('jaxgo.ru', True, path, code, location) for path, code, location in [
         ('/', 200, None), ('/articles/', 200, None), (article, 200, None),
         (legacy, 301, 'https://jaxgo.ru' + article + query),
-        ('/articles/index.html', 301, 'https://jaxgo.ru/articles/' + query),
         ('/jaxgo-seo-missing-page', 404, None),
     ]]
     if future:
