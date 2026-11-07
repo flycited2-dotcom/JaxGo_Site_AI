@@ -86,7 +86,7 @@ def install_import(root, state, staged):
         if not current or proposed[:len(current)] != current:
             raise ValueError('Import must append to the installed plan')
         last = Path('releases')/current[-1]['id']/'inventory.json'
-        if (root/last).read_bytes() != (staged/last).read_bytes():
+        if json.loads((root/last).read_bytes()) != json.loads((staged/last).read_bytes()):
             raise ValueError('Existing article sources or site assets changed; review as a separate release')
         additions = proposed[len(current):]
         ids = {job['id'] for job in current}
@@ -113,7 +113,7 @@ def install_import(root, state, staged):
                     if relative.is_absolute() or '..' in relative.parts or digest((source/name).read_bytes()) != checksum:
                         raise ValueError('Invalid staged inventory: '+aid)
                 if target.exists():
-                    if ((target/'inventory.json').read_bytes() != inventory_file
+                    if (json.loads((target/'inventory.json').read_bytes()) != inventory
                             or any(digest((target/name).read_bytes()) != checksum for name, checksum in inventory.items())):
                         raise ValueError('Conflicting release directory: '+aid)
                     continue
