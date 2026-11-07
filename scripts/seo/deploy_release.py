@@ -99,6 +99,7 @@ def migrate(root, state, stage):
                     path.chmod(0o755 if path.is_dir() else 0o644)
                 swapped = []
                 changed = []
+                retired = {}
                 originals = {}
                 with closing(publisher.connect()) as ftp:
                     publisher.make_directories(ftp, payload)
@@ -125,6 +126,23 @@ def migrate(root, state, stage):
                                 upload(ftp, name, data, tag)
                             else:
                                 publisher.put(ftp, db, state, name, data, 'seo-'+tag)
+                        # SprintHost can serve existing HTML through its static layer.
+                        # Retire old files so requests reach the canonical rewrite rules.
+                        for job in published:
+                            name = job['url'].strip('/') + '.html'
+                            before = publisher.retrieve(ftp, name)
+                            if before is None:
+                                continue
+                            checksum = publisher.digest(before)
+                            tracked = db.execute('SELECT expected, committed FROM files WHERE path=?', (name,)).fetchone()
+                            if tracked and tracked != (checksum, checksum):
+                                raise ValueError('Legacy article changed outside the queue: '+name)
+                            destination = backup/'public'/name
+                            destination.parent.mkdir(parents=True, exist_ok=True)
+                            destination.write_bytes(before)
+                            archived = str(PurePosixPath(name).with_name('.jaxgo-retired-'+tag+'-'+PurePosixPath(name).name))
+                            retired[name] = archived
+                            ftp.rename('/public_html/'+name, '/public_html/'+archived)
                         verify_http(published, future, bundle, inventory)
                         for name in ('releases', 'plan.json', 'publisher.py'):
                             (root/name).rename(backup/name)
@@ -133,6 +151,9 @@ def migrate(root, state, stage):
                         with closing(sqlite3.connect(state/'queue-backup.sqlite')) as copy:
                             db.backup(copy)
                     except Exception:
+                        for name, archived in retired.items():
+                            if publisher.retrieve(ftp, name) is None and publisher.retrieve(ftp, archived) is not None:
+                                ftp.rename('/public_html/'+archived, '/public_html/'+name)
                         for name in reversed(swapped):
                             if (root/name).exists():
                                 (root/name).rename(prepared/name)
